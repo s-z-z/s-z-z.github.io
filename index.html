@@ -1,1 +1,78 @@
-hello
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>程序存活状态监控s</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f0f2f5; }
+        .day-row { display: flex; align-items: center; margin-bottom: 8px; background: white; padding: 12px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .date-label { width: 110px; font-size: 14px; color: #333; }
+        .grid-container { display: flex; gap: 3px; }
+        .hour-box { width: 18px; height: 18px; border-radius: 2px; position: relative; cursor: help; }
+        .alive { background-color: #52c41a; }
+        .dead { background-color: #ff4d4f; }
+        .hour-box:hover::after {
+            content: attr(data-hour);
+            position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+            background: #000; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<div id="status-board">正在加载运行记录...</div>
+
+<script>
+    async function loadAndRender() {
+        const container = document.getElementById('status-board');
+        try {
+            const response = await fetch('text.txt?v=' + Date.now());
+            if (!response.ok) throw new Error('未找到数据文件 (text.txt)');
+
+            const rawText = await response.text();
+            const data = {};
+
+            // 解析并按日期组织数据
+            rawText.trim().split('\n').forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length < 2) return;
+
+                const date = parts[0];
+                const hour = parseInt(parts[1].split(':')[1] ? parts[1].split(':')[0] : parts[1], 10);
+
+                if (!data[date]) data[date] = new Set();
+                data[date].add(hour);
+            });
+
+            // 排序逻辑：获取所有日期键值，进行降序排列
+            const sortedDates = Object.keys(data).sort((a, b) => b.localeCompare(a));
+
+            if (sortedDates.length === 0) {
+                container.innerHTML = '暂无有效记录';
+                return;
+            }
+
+            container.innerHTML = '';
+            sortedDates.forEach(date => {
+                const row = document.createElement('div');
+                row.className = 'day-row';
+
+                let gridHtml = `<div class="date-label">${date}</div><div class="grid-container">`;
+                for (let i = 0; i < 24; i++) {
+                    const statusClass = data[date].has(i) ? 'alive' : 'dead';
+                    gridHtml += `<div class="hour-box ${statusClass}" data-hour="${i}:00"></div>`;
+                }
+                gridHtml += `</div>`;
+
+                row.innerHTML = gridHtml;
+                container.appendChild(row);
+            });
+        } catch (err) {
+            container.innerHTML = `<div style="color:red">加载失败: ${err.message}</div>`;
+        }
+    }
+
+    loadAndRender();
+</script>
+</body>
+</html>
